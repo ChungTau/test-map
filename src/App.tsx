@@ -1,5 +1,5 @@
 import * as React from 'react';
-import Map, { Layer, MapRef, Source } from 'react-map-gl';
+import Map, { Layer, MapRef, Marker, Source } from 'react-map-gl';
 import GpxParser, { Route, Track } from 'gpxparser';
 import { useRef, useState } from 'react';
 import { Feature, LineString, Position, Properties, lineString, point } from '@turf/helpers';
@@ -108,7 +108,7 @@ export default function App() {
         const newRoute = lineString(positions);
         setRoute(newRoute);
         setCurrentPosition(newRoute.geometry.coordinates[0]);
-        mapRef.current?.addImage('pulsing-dot', pulsingDot, {pixelRatio:2});
+        //mapRef.current?.addImage('pulsing-dot', pulsingDot, {pixelRatio:2});
         pulsingDot.onAdd(mapRef);
         pulsingDot.render(mapRef);
         const boundOfRoute = bbox(newRoute);
@@ -169,11 +169,16 @@ export default function App() {
       style={{width:'100vw', height:'100vh'}}
       mapStyle="mapbox://styles/edwardonionc/clhbgbxbk000901pvgwba9sp0" 
     >
-      {route && (
+      {route && /*(
         <Source id='point' type='geojson' data={point(currentPosition!)}>
           <Layer id='point' type='symbol' layout={{"icon-image":'pulsing-dot'}}/>
         </Source>
-      )}
+        
+      )*/
+      (
+        <Marker pitchAlignment='map' longitude={currentPosition?.[0]} latitude={currentPosition?.[1]} anchor='center'></Marker>
+      )
+      }
 
     {route && (
         <Source id="routeSource" type='geojson' lineMetrics={true} data={route}>
