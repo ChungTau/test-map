@@ -6,6 +6,7 @@ import { Feature, LineString, Position, Properties, lineString, point } from '@t
 import { along, bbox } from '@turf/turf';
 import { Fab } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import SwapIcon from '@mui/icons-material/SwitchLeft'
 import PlayIcon from '@mui/icons-material/PlayArrow';
 import {pulsingDot } from './PulsingDot';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [currentPosition, setCurrentPosition] = useState<Position>();
   const [gpxDetails, setGpxDetails] = useState<Route[] | Track[]|undefined>(undefined);
   const [lineDashed, setLineDashed] = useState < number[] > ([0, 4, 3]);
+  const [swapStyle, setSwapStyle] = useState(false);
   //refs
   const mapRef = useRef < MapRef > (null);
   //vars
@@ -52,11 +54,11 @@ export default function App() {
     var lngDiff =
       ((altitude / Math.tan(pitchInRadian)) *
         Math.sin(-bearingInRadian)) /
-      90000; // ~70km/degree longitude
+      70000; // ~70km/degree longitude
     var latDiff =
       ((altitude / Math.tan(pitchInRadian)) *
         Math.cos(-bearingInRadian)) /
-      90000 // 110km/degree latitude
+      110000 // 110km/degree latitude
     
     var correctedLng = targetPosition[0] + lngDiff;
     var correctedLat = targetPosition[1] - latDiff;
@@ -116,19 +118,24 @@ export default function App() {
             ?.fitBounds([
                 [boundOfRoute[0], boundOfRoute[1]],
                 [boundOfRoute[2], boundOfRoute[3]]
-            ],{duration:2000});
+            ],{duration:2000, padding:20});
         requestAnimationFrame(animateDashArray);
       }
       reader.readAsText(file);
     }
   }
 
+  const handleStyleSwapClick =() =>{
+    setSwapStyle(!swapStyle);
+    console.log(swapStyle);
+  }
+
   const handleFlyButton = () => {
     if(mapRef.current){
       if(currentPosition){
         //const camera = mapRef.current?.getFreeCameraOptions();
-        const newPos = computeCameraPosition(50, 0, currentPosition, 800);
-        mapRef.current.flyTo({center:newPos, pitch:50, bearing:0, duration:2000, zoom:16});
+        //const newPos = computeCameraPosition(32, 0, currentPosition, 1000);
+        mapRef.current.flyTo({center: [currentPosition[0], currentPosition[1]], pitch:50, bearing:0, duration:2000, zoom:15});
         setTimeout(()=>{
           window.requestAnimationFrame(animateFlyAlongRoute);
         },2400);
@@ -140,6 +147,12 @@ export default function App() {
     if(!start)start = time;
     const animationPhase = (time - start)/gpxDetails?.[0].distance.total!/4;
     if(animationPhase > 1){
+      const boundOfRoute = bbox(route);
+      mapRef.current
+      ?.fitBounds([
+          [boundOfRoute[0], boundOfRoute[1]],
+          [boundOfRoute[2], boundOfRoute[3]]
+      ],{duration:2000, padding:20});
       return;
     }
     if(route && gpxDetails){
@@ -147,8 +160,8 @@ export default function App() {
       setCurrentPosition(alongPath);
       const bearing = 0 + animationPhase * 200.0;
       if(mapRef.current){
-        const newPos = computeCameraPosition(50, bearing, alongPath, 800);
-        mapRef.current.easeTo({center:newPos, pitch:50, bearing:bearing, zoom:16, duration:0});
+        //const newPos = computeCameraPosition(42, bearing, alongPath, 1000);
+        mapRef.current.easeTo({center:[alongPath[0], alongPath[1]], pitch:50, bearing:bearing, zoom:15, duration:0});
         window.requestAnimationFrame(animateFlyAlongRoute);
       }
     }
@@ -167,17 +180,22 @@ export default function App() {
         pitch:20
       }}
       style={{width:'100vw', height:'100vh'}}
-      mapStyle="mapbox://styles/edwardonionc/clhbgbxbk000901pvgwba9sp0" 
+      terrain={{source: 'mapbox-dem', exaggeration: 1.5}}
+      mapStyle={(swapStyle)?"mapbox://styles/mapbox/satellite-v9":"mapbox://styles/edwardonionc/clhbgbxbk000901pvgwba9sp0"} 
     >
-      {route && /*(
+      <Source
+          id="mapbox-dem"
+          type="raster-dem"
+          url="mapbox://mapbox.mapbox-terrain-dem-v1"
+          tileSize={512}
+          maxzoom={14}
+        />
+      {route && (
         <Source id='point' type='geojson' data={point(currentPosition!)}>
-          <Layer id='point' type='symbol' layout={{"icon-image":'pulsing-dot'}}/>
+          <Layer id='point' type='circle' paint={{'circle-color':"#8deafc", "circle-radius":14, "circle-stroke-color": "#EEEEEE", "circle-stroke-width":5, "circle-stroke-opacity":0.75}}/>
         </Source>
-        
-      )*/
-      (
-        <Marker pitchAlignment='map' longitude={currentPosition?.[0]} latitude={currentPosition?.[1]} anchor='center'></Marker>
       )
+      
       }
 
     {route && (
@@ -206,6 +224,9 @@ export default function App() {
     <Fab color="primary" size='small' aria-label="add" style={{position:"absolute", top:10, right:10}} onClick={handleFabClick}>
       <AddIcon/>
     </Fab>
+    <Fab color="primary" size='small' aria-label="swap" style={{position:"absolute", top:70, right:10}} onClick={handleStyleSwapClick}>
+      <SwapIcon/>
+    </Fab>
     {
       route && (
         <Fab
@@ -216,7 +237,7 @@ export default function App() {
           style={{
             position: 'absolute',
             right: 10,
-            top: 70
+            top: 130
           }}
         >
         <PlayIcon/>
