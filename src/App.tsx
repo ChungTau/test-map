@@ -130,12 +130,17 @@ export default function App() {
     label,
   }: TooltipProps<ValueType, NameType>) => {
     if (active) {
-      return (
-        <div className="custom-tooltip" style={{backgroundColor:"#DDDDDD", paddingTop:2, paddingBottom:2, paddingLeft:16, paddingRight:16, opacity:0.92}}>
-          <p className="distance">{`Distance : ${label.toFixed(2)} km`}</p>
-          <p className="desc">{`Elevation : ${parseFloat(payload?.[0].value?.toString()!).toFixed(2)} m`}</p>
-        </div>
-      );
+      if(payload){
+        const payl = payload[0].payload;
+        const position:Position=[payl.lon, payl.lat];
+        setCurrentPosition(position);
+        return (
+          <div className="custom-tooltip" style={{backgroundColor:"#DDDDDD", paddingTop:2, paddingBottom:2, paddingLeft:16, paddingRight:16, opacity:0.92}}>
+            <p className="distance">{`Distance : ${label.toFixed(2)} km`}</p>
+            <p className="desc">{`Elevation : ${parseFloat(payload?.[0].value?.toString()!).toFixed(2)} m`}</p>
+          </div>
+        );
+      }
     }
   
     return null;
@@ -242,7 +247,11 @@ export default function App() {
         <YAxis  dataKey="ele" tickFormatter={(value)=>value.toFixed(0)} axisLine={false} tickLine={false}  />
         <Tooltip content={<CustomTooltip />} />
         <CartesianGrid stroke="#f5f5f5"  />
-        <Line type="monotone" dataKey="ele" stroke="#ff7300" yAxisId={0} dot={false}/>
+        <Line type="monotone" dataKey="ele" stroke="#ff7300" yAxisId={0} dot={false} onMouseMove={(event: any) => {
+          const { chartX, chartY } = event;
+          console.log(`Mouse coordinates: (${chartX}, ${chartY})`);
+          // Perform your desired action here
+        }}/>
       </LineChart>
       </ResponsiveContainer>}
     </Container>
