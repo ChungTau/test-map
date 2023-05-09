@@ -1,14 +1,15 @@
-import * as React from 'react';
 import Map, { Layer, MapRef, Marker, Source } from 'react-map-gl';
-import GpxParser, { Route, Track } from 'gpxparser';
+import GpxParser, { Point, Route, Track } from 'gpxparser';
 import { useRef, useState } from 'react';
 import { Feature, LineString, Position, Properties, lineString, point } from '@turf/helpers';
 import { along, bbox } from '@turf/turf';
-import { Fab } from '@mui/material';
+import { Box, Container, Fab } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SwapIcon from '@mui/icons-material/SwitchLeft'
 import PlayIcon from '@mui/icons-material/PlayArrow';
 import {pulsingDot } from './PulsingDot';
+import { CartesianGrid, Line, Tooltip, XAxis, LineChart, ResponsiveContainer, YAxis, Legend, TooltipProps, ZAxis } from 'recharts';
+import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 
 export default function App() {
   
@@ -16,30 +17,12 @@ export default function App() {
   const [route, setRoute] = useState < Feature < LineString,Properties >| null > (null);
   const [currentPosition, setCurrentPosition] = useState<Position>();
   const [gpxDetails, setGpxDetails] = useState<Route[] | Track[]|undefined>(undefined);
-  const [lineDashed, setLineDashed] = useState < number[] > ([0, 4, 3]);
   const [swapStyle, setSwapStyle] = useState(false);
+  const [chartData, setChartData] = useState<any[]>([]);
   //refs
   const mapRef = useRef < MapRef > (null);
-  //vars
-  let start:number = 0;
-  //constants
-  const dashArraySequence = [
-    [0, 4, 3],
-    [0.5, 4, 2.5],
-    [1, 4, 2],
-    [1.5, 4, 1.5],
-    [2, 4, 1],
-    [2.5, 4, 0.5],
-    [3, 4, 0],
-    [0, 0.5, 3, 3.5],
-    [0, 1, 3, 3],
-    [0, 1.5, 3, 2.5],
-    [0, 2, 3, 2],
-    [0, 2.5, 3, 1.5],
-    [0, 3, 3, 1],
-    [0, 3.5, 3, 0.5]
-  ];
 
+  let start = 0;
   //functions
   const computeCameraPosition = (
     pitch:number,
@@ -70,11 +53,7 @@ export default function App() {
   
     return newCameraPosition
    }
-   const animateDashArray = (timestamp : number) => {
-    const index = Math.floor(timestamp / 100) % dashArraySequence.length;
-    setLineDashed(dashArraySequence[index]);
-    requestAnimationFrame(animateDashArray);
-  }
+  
   const handleFabClick = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -92,7 +71,7 @@ export default function App() {
         const gpx = event.target?.result as string;
         const parser = new GpxParser();
         parser.parse(gpx);
-        let routeArray;
+        let routeArray: any;
         if(parser.routes.length>0){
           routeArray = parser.routes;
         }else if(parser.tracks.length>0){
@@ -101,12 +80,15 @@ export default function App() {
           return;
         }
         setGpxDetails(routeArray);
-        const positions = routeArray[0].points.map((node:any)=>{
-          const lat : number = parseFloat(node.lat);
-          const lon : number = parseFloat(node.lon);
+        let dataSet:any[] = [];
+        const positions = routeArray[0].points.map((node:Point)=>{
+          const lat : number = node.lat;
+          const lon : number = node.lon;
           const position : Position = [lon, lat];
+          dataSet[dataSet.length] = {"lat":lat, "lon": lon, "ele": node.ele, "distance": (routeArray[0].distance.cumul[dataSet.length])/1000}
           return position;
         });
+        setChartData(dataSet);
         const newRoute = lineString(positions);
         setRoute(newRoute);
         setCurrentPosition(newRoute.geometry.coordinates[0]);
@@ -119,7 +101,6 @@ export default function App() {
                 [boundOfRoute[0], boundOfRoute[1]],
                 [boundOfRoute[2], boundOfRoute[3]]
             ],{duration:2000, padding:20});
-        requestAnimationFrame(animateDashArray);
       }
       reader.readAsText(file);
     }
@@ -142,6 +123,23 @@ export default function App() {
       }
     }
   }
+
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: TooltipProps<ValueType, NameType>) => {
+    if (active) {
+      return (
+        <div className="custom-tooltip" style={{backgroundColor:"#DDDDDD", paddingTop:2, paddingBottom:2, paddingLeft:16, paddingRight:16, opacity:0.92}}>
+          <p className="distance">{`Distance : ${label.toFixed(2)} km`}</p>
+          <p className="desc">{`Elevation : ${parseFloat(payload?.[0].value?.toString()!).toFixed(2)} m`}</p>
+        </div>
+      );
+    }
+  
+    return null;
+  };
 
   const animateFlyAlongRoute = (time:number)=>{
     if(!start)start = time;
@@ -168,7 +166,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <div style={{boxSizing:"border-box"}}>
     <Map
       id='map'
       ref={mapRef}
@@ -179,7 +177,7 @@ export default function App() {
         zoom: 14,
         pitch:20
       }}
-      style={{width:'100vw', height:'100vh'}}
+      style={{width:'100vw', height:'80vh'}}
       terrain={{source: 'mapbox-dem', exaggeration: 1.5}}
       mapStyle={(swapStyle)?"mapbox://styles/mapbox/satellite-v9":"mapbox://styles/edwardonionc/clhbgbxbk000901pvgwba9sp0"} 
     >
@@ -216,11 +214,38 @@ export default function App() {
                 "line-color": 'yellow',
                 'line-opacity': 0.8,
                 "line-width": 4,
-                'line-dasharray': lineDashed
+                'line-dasharray': [0,4,3]
             }}/>
         </Source>
     )}
     </Map>
+    <Container maxWidth={false} style={{boxSizing: 'border-box',width:'100vw', height:'20vh', backgroundColor:'#333', padding:0}}>
+    {route&&<ResponsiveContainer width="100%" height="90%">
+      <LineChart
+        width={Math.max(
+          document.body.scrollWidth,
+          document.documentElement.scrollWidth,
+          document.body.offsetWidth,
+          document.documentElement.offsetWidth,
+          document.documentElement.clientWidth
+        )}
+        height={230}
+        data={chartData}
+        onClick={()=>{console.log();}}
+        margin={{ top: 20, right: 20, left: 0, bottom: 5 }}
+      >
+        <XAxis dataKey="distance" type="number"
+          tickFormatter={(value) => value.toFixed(2)}
+          tickCount={10}
+          domain={["dataMin", "dataMax"]}
+          allowDecimals={true} />
+        <YAxis  dataKey="ele" tickFormatter={(value)=>value.toFixed(0)} axisLine={false} tickLine={false}  />
+        <Tooltip content={<CustomTooltip />} />
+        <CartesianGrid stroke="#f5f5f5"  />
+        <Line type="monotone" dataKey="ele" stroke="#ff7300" yAxisId={0} dot={false}/>
+      </LineChart>
+      </ResponsiveContainer>}
+    </Container>
     <Fab color="primary" size='small' aria-label="add" style={{position:"absolute", top:10, right:10}} onClick={handleFabClick}>
       <AddIcon/>
     </Fab>
@@ -244,6 +269,6 @@ export default function App() {
         </Fab>
       )
     }
-    </>
+    </div>
   );
 }
